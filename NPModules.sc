@@ -1,0 +1,166 @@
+// This work is licensed under GNU GPL v3 or later. See the LICENSE file in the top-level directory.
+
+
+NPModules {
+    classvar <protoDict;
+    classvar <all;
+    var <moduleDict;
+    var <proxyspace;
+
+    *initClass {
+        this.registerToAbstractPlayControl;
+        all = ();
+
+        protoDict = (
+            sine: {|dict|
+                var freq = dict[\freq] ?? {{\freq.kr(440)}};
+                {
+                    SinOsc.ar(freq)
+                }
+            },
+            sinefb: {|dict|
+                var freq = dict[\freq] ?? {{\freq.kr(440)}};
+                var fb = dict[\fb] ?? {{\fb.kr(0, spec: [0, 2])}};
+                {
+                    SinOscFB.ar(freq, fb)
+                }
+            },
+            amp: {|dict|
+                var amp = dict[\amp] ? 0.1;
+                (\filter -> {|in|
+                    in * amp
+                })
+            },
+            util: {|dict, idx|
+                var ampDb   = this.krFunc(\ampDb, [-24, 24, \lin, 0, 0], dict, idx);
+                var distort = this.krFunc(\distort, [0, 10, \lin, 0, 0], dict, idx);
+                var lpFreq  = this.krFunc(\lpFreq, \freq.asSpec.default_(20), dict, idx);
+                var hpFreq  = this.krFunc(\hpFreq, \freq.asSpec.default_(20000), dict, idx);
+                (\filter -> {|in|
+                    in = (in * (1+distort)).tanh;
+                    in = LPF.ar(HPF.ar(in, hpFreq), lpFreq);
+                    in = in * ampDb.dbamp;
+                })
+            },
+                
+            in: {|dict|
+                var ins = dict[\ins] ? 0;
+                {
+                    SoundIn.ar(ins)
+                }
+            },
+            lhpf: {|dict|
+                var lpFreq = dict[\lpFreq] ? 12000;
+                var hpFreq = dict[\hpFreq] ? 20;
+                    
+                (\filter -> {|in| 
+                    LPF.ar(HPF.ar(in, hpFreq), lpFreq);
+                })
+            },
+            distort: {|dict|
+                var distort = dict[\distort] ? 2;
+                (\filter -> {|in| (in * (1+distort)).tanh})
+            }
+        )
+    }
+
+    // helper function to create kr control functions with index suffix
+    // to avoid name clashes when multiple instances of the same module are used
+    // e.g. \freq -> \freq0, \freq1, ...
+    *krFunc {|name, spec, dict, idx|
+        ^(dict[name] ?? {{ "%%".format(name, idx).asSymbol.kr(spec: spec) }});
+    }
+
+    *registerToAbstractPlayControl {
+        AbstractPlayControl.proxyControlClasses.put(\module, SynthDefControl);
+        AbstractPlayControl.buildMethods.put(\module, #{ | func, proxy, channelOffset = 0, index |
+            var role, moduleName, dict, obj;
+            var npModules = NPModules.all.at(proxy.proxyspace);
+
+            // create NPModules instance for this proxyspace if not existing yet
+            npModules.isNil.if({
+                npModules = NPModules(proxy.proxyspace);
+            });
+
+            // func can be a Symbol (name of module) or a Dictionary (with at least an entry "\name")
+            if(func.isKindOf(Symbol), {
+                dict = (); // empty dict
+                moduleName = func;
+                role = nil; // default role, i.e. function
+            }, { // assumed to be a dictionary
+                dict = func; // pass whole dict to module function
+                moduleName = func[\name].value; // required
+                role = func[\role].value; // returns nil if not present
+            });
+            if(moduleName.isNil) { Error("AbstractPlayControl: no module name given").throw };
+            func = npModules[moduleName]; // get function from npModules
+            // if(func.isNil) { Error("AbstractPlayControl: module not found: " ++ moduleName).throw };
+
+            if(role.notNil) {
+                obj = (role -> func.value(dict, index));
+            } {
+                obj = func.value(dict, index);
+            };
+
+            obj.buildForProxy(proxy, channelOffset, index);
+        });
+    }
+
+    *new {|proxyspace|
+        // the default space is the Ndef localhost space
+        proxyspace = proxyspace ?? Ndef.dictFor(Server.default);
+        this.all[proxyspace].isNil.if({
+            ^super.new.init(proxyspace);
+        }, {
+            ^this.all[proxyspace];
+        });
+    }
+
+    init{|argProxyspace|
+        proxyspace = argProxyspace;
+
+        moduleDict = ();
+        moduleDict.proto = this.class.protoDict;
+        this.class.all[proxyspace] = this;
+    }
+
+    at {|key|
+        ^moduleDict[key]    
+    }
+
+    put {|key, value, updateNodes = true|
+        moduleDict.put(key, value);
+        updateNodes.if{
+            proxyspace.do{|proxy|
+                proxy.objects.keysValuesDo{|idx, synthDefControl|
+                    var source = synthDefControl.source;
+                    // "source: %".format(source.asCompileString()).postln;
+                    source.respondsTo(\key).if{
+                        (source.key == \module).if {
+                            var module = source.value;
+
+                            // "module: %".format(module).postln;
+                            // "idx: % (%)".format(idx, idx.class).postln;
+                            // "proxy: %".format(proxy.asCompileString()).postln;
+
+                            // module can be either a Symbol or a Dictionary
+                            // check if module is for the given name
+                            module.respondsTo(\at).if({ // is a dictionary
+                                (module[\name] == key).if{
+                                    proxy.put(idx, source); // trigger rebuild
+                                };
+                            }, { // assume module to be a symbol
+                                (module == key).if{
+                                    proxy.put(idx, source); // trigger rebuild
+                                };
+                            });
+                        };
+                    };
+                }
+            }
+        }
+    }
+
+
+
+}

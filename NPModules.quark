@@ -1,0 +1,10 @@
+(
+	\name: "NPModules",
+	\path: "NPModules",
+	\summary: "registry of pre-defined NodeProxy modules",
+	\author: "Till Bovermann",
+	\organization: "tai-studio",
+    \version: "0.1",
+    \url: "https://tai-studio.org"
+)
+

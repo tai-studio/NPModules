@@ -1,0 +1,102 @@
+TITLE:: NPModules
+summary:: registry of small reusable module functions for NodeProxy
+categories:: Live Coding>ProxySpace
+related:: Classes/NodeProxy, Classes/Ndef, Classes/ProxySpace, Classes/AbstractPlayControl, Classes/SynthDefControl
+
+DESCRIPTION::
+Provides a light-weight way to define and reuse small signal / filter / utility modules to populate a link::Classes/NodeProxy::.
+
+Instead of writing full functions each time, you can reference a named module.
+
+code::
+// simplest: refer to an existing module by name (Symbol)
+Ndef(\tone, \module -> \sine);   // looks up \sine in NPModules for that proxyspace
+
+// with parameters: pass a Dictionary containing at least \name and optional params
+Ndef(\tone2, \module -> (name: \sine, freq: 220));
+::
+
+CLASSMETHODS::
+
+METHOD:: new
+argument:: proxyspace The ProxySpace dictionary. 
+Returns:: An code::NPModules:: instance.
+
+METHOD:: protoDict
+The prototype dictionary of built-in modules.
+Can be adapted and extended for global changes.
+
+METHOD:: all
+A dictionary of all code::NPModules:: instances.
+
+METHOD:: registerToAbstractPlayControl
+announces the code::\module -> :: role for code::NodeProxy:: instances. See link::Reference/NodeProxy_roles:: .
+
+PRIVATE:: initClass
+
+INSTANCEMETHODS::
+
+METHOD:: moduleDict
+Underlying dictionary storing user-added (or overridden) modules; its proto is the class protoDict.
+
+METHOD:: proxyspace
+The proxyspace dictionary this registry belongs to.
+
+
+METHOD:: at
+argument:: key Symbol name of module.
+Returns:: The module function (or role-returning function) or nil if not found.
+
+METHOD:: put
+argument:: key Symbol name to bind.
+argument:: value Function receiving a dict and returning either a UGen function or a role mapping.
+argument:: updateNodes Boolean (default false).
+Returns:: The value inserted.
+
+EXAMPLES::
+
+code::
+// Basic sine with default frequency
+Ndef(\a, \module -> \sine).play;
+
+// sine with fixed frequency
+Ndef(\a, \module -> (name: \sine, freq: 330)).play;
+
+// sine with frequency control
+Ndef(\a, \module -> (name: \sine, freq: {\freq.kr(100)})).play;
+::
+
+Distort a custom sound (in slot code::0::):
+
+code::
+Ndef(\a, {PMOsc.ar}); // simple sine
+
+
+
+Write your own modules by adding it to the registry for the relevant ProxySpace:
+
+code::
+// Add custom module
+n = NPModules(); // nil means the default Ndef space
+
+n.put(\simpleSound, { |dict| 
+    var f = dict[\freq] ? 200; 
+    { LFTri.ar(f) } // returns a UGen function
+});
+::
+
+Then use it in a proxy:
+
+code::
+Ndef(\c, \module -> (name: \simpleSound, freq: 150));.play;
+::
+
+Change the sound by redefining the module:
+
+code::
+n.put(\simpleSound, { |dict| 
+    var f = dict[\freq] ? 200; 
+    { LPF.ar(LFSaw.ar(f), f * 2) } // new definition
+}, updateNodes: true); // rebuild any proxies using this module
+::
+
