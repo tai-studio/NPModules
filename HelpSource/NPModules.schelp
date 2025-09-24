@@ -70,7 +70,7 @@ Distort a custom sound (in slot code::0::):
 
 code::
 Ndef(\a, {PMOsc.ar}); // simple sine
-
+::
 
 
 Write your own modules by adding it to the registry for the relevant ProxySpace:

@@ -27,3 +27,29 @@ Ndef(\a)[0]=  \module -> (name: \sinefb, \freq: {LFNoise0.kr(10).range(50, 74).r
 Ndef(\a)[2] = \module -> \util; // a utility module with some basic filters
 ```
 
+Write your own modules by adding it to the registry for the relevant ProxySpace:
+
+```sc
+// Add custom module
+n = NPModules(); // nil means the default Ndef space
+​
+n.put(\simpleSound, { |dict| 
+    var f = dict[\freq] ? 200; 
+    { LFTri.ar(f) } // returns a UGen function
+});
+```
+
+Then use it in a proxy:
+
+```sc
+Ndef(\c, \module -> (name: \simpleSound, freq: 150));.play;
+```
+
+Change the sound by redefining the module:
+
+```sc
+n.put(\simpleSound, { |dict| 
+    var f = dict[\freq] ? 200; 
+    { LPF.ar(LFSaw.ar(f), f * 2) } // new definition
+}, updateNodes: true); // rebuild any proxies using this module, default is true
+```
