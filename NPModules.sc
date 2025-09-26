@@ -2,7 +2,7 @@
 
 
 NPModules {
-    classvar <protoDict;
+    classvar <parentDict;
     classvar <all;
     var <moduleDict;
     var <proxyspace;
@@ -11,7 +11,7 @@ NPModules {
         this.registerToAbstractPlayControl;
         all = ();
 
-        protoDict = (
+        parentDict = (
             sine: {|dict|
                 var freq = dict[\freq] ?? {{\freq.kr(440)}};
                 {
@@ -57,9 +57,14 @@ NPModules {
                     LPF.ar(HPF.ar(in, hpFreq), lpFreq);
                 })
             },
-            distort: {|dict|
-                var distort = dict[\distort] ? 2;
+            distort: {|dict, idx|
+                var distort = dict[\distort] ? 0;
                 (\filter -> {|in| (in * (1+distort)).tanh})
+            },
+            default: {|dict|
+                {
+                    {nil} // TODO: would be nice to be able to completely remvove the module, i.e. np[idx] = nil.
+                }
             }
         )
     }
@@ -67,8 +72,8 @@ NPModules {
     // helper function to create kr control functions with index suffix
     // to avoid name clashes when multiple instances of the same module are used
     // e.g. \freq -> \freq0, \freq1, ...
-    *krFunc {|name, spec, dict, idx|
-        ^(dict[name] ?? {{ "%%".format(name, idx).asSymbol.kr(spec: spec) }});
+    *krFunc {|name, spec, dict, idx, lag|
+        ^(dict[name] ?? {{ "%%".format(name, idx).asSymbol.kr(spec: spec, lag: lag) }});
     }
 
     *registerToAbstractPlayControl {
@@ -93,8 +98,13 @@ NPModules {
                 role = func[\role].value; // returns nil if not present
             });
             if(moduleName.isNil) { Error("AbstractPlayControl: no module name given").throw };
+            // if(moduleName.isNil) { moduleName = \default }; // fallback to default module
             func = npModules[moduleName]; // get function from npModules
-            // if(func.isNil) { Error("AbstractPlayControl: module not found: " ++ moduleName).throw };
+            if(func.isNil) { 
+                ("AbstractPlayControl: no module named '%' found, using default module instead".format(moduleName)).warn;
+                role = nil; // ignore role
+                func = npModules[\default] // fallback to default module
+            }; 
 
             if(role.notNil) {
                 obj = (role -> func.value(dict, index));
@@ -120,12 +130,26 @@ NPModules {
         proxyspace = argProxyspace;
 
         moduleDict = ();
-        moduleDict.proto = this.class.protoDict;
+        moduleDict.parent = this.class.parentDict;
         this.class.all[proxyspace] = this;
     }
 
     at {|key|
         ^moduleDict[key]    
+    }
+
+    // borrowed from Modality Toolkit (+Dictionary)
+	pr_allKeys {|species|
+		var dict = this.moduleDict, ancestry = [];
+		while { dict.notNil } {
+			ancestry = ancestry.add(dict);
+			dict = dict.parent;
+		};
+		^ancestry.collect { |dict| dict.keys(species) }
+	}
+
+    moduleKeys {
+        ^this.pr_allKeys(Array).flat.asSet
     }
 
     put {|key, value, updateNodes = true|

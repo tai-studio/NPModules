@@ -19,12 +19,15 @@ Ndef(\tone2, \module -> (name: \sine, freq: 220));
 CLASSMETHODS::
 
 METHOD:: new
-argument:: proxyspace The ProxySpace dictionary. 
+argument:: proxyspace 
+The ProxySpace this instance opereates on. Defaults to the Ndef proxyspace for the default server.
 Returns:: An code::NPModules:: instance.
 
-METHOD:: protoDict
+METHOD:: parentDict
 The prototype dictionary of built-in modules.
 Can be adapted and extended for global changes.
+Changing elements here is propagated to existing code::NPModules:: instances, however, existing instances in code::NodeProxy:: instances are not updated automatically.
+
 
 METHOD:: all
 A dictionary of all code::NPModules:: instances.
@@ -32,25 +35,72 @@ A dictionary of all code::NPModules:: instances.
 METHOD:: registerToAbstractPlayControl
 announces the code::\module -> :: role for code::NodeProxy:: instances. See link::Reference/NodeProxy_roles:: .
 
+METHOD:: krFunc
+helper function to create kr control functions with index suffix to avoid name clashes when multiple instances of the same module are used e.g. code::\freq -> \freq0, \freq1, ...::
+
+code::
+(
+NPModules()[\sines] = {|dict, idx|
+	var amp = NPModules.krFunc(\amp, \amp.asSpec, dict, idx);
+	var lfreq = NPModules.krFunc(\lfreq, [10, 40, \exp], dict, idx);	
+	var mfreq = dict[\mfreq] ? 440; // fixed value that can be overridden by dict
+	var hfreq = dict[\hfreq] ?? {{\hfreq.kr(880)}}; // if not overridden, use a NamedControl that has a fixed name, no matter how many instances of this module (and others with a hfreq NamedControl) are used.
+	{
+        amp * SinOsc.ar(mfreq + (SinOsc.kr(lfreq) * hfreq))
+	}
+};
+)
+
+Ndef(\a)[0] = \module -> \sines; // controls: lfreq0, 440, hfreq (shared with others)
+Ndef(\a)[1] = \module -> \sines; // controls: lfreq1, 440, hfreq (shared with others)
+Ndef(\a)[10] = \module -> \sines; // controls: lfreq10, 440, hfreq (shared with others)
+Ndef(\a)[13] = \module -> \sines; // controls: lfreq13, 440, hfreq (shared with others)
+
+Ndef(\a).edit
+::
+
+argument:: name
+the base name (Symbol).
+argument:: spec
+the spec to use
+argument:: dict
+the dictionary passed to the module function.
+argument:: idx
+the index of the NodeProxy instance.
+argument:: lag
+lag time. defaults to 0
+RETURNS:: A function that returns a link::Classes/NamedControl:: with the appropriate name and spec.
+
+
+
+
 PRIVATE:: initClass
 
 INSTANCEMETHODS::
 
 METHOD:: moduleDict
-Underlying dictionary storing user-added (or overridden) modules; its proto is the class protoDict.
+dictionary of modules.
+
+METHOD:: moduleKeys
+Returns:: A code::Set:: of all module names (code::Symbol::) available.
+
 
 METHOD:: proxyspace
-The proxyspace dictionary this registry belongs to.
+The proxyspace dictionary this instance operates on.
 
 
 METHOD:: at
-argument:: key Symbol name of module.
+argument:: key 
+Symbol name of module.
 Returns:: The module function (or role-returning function) or nil if not found.
 
 METHOD:: put
-argument:: key Symbol name to bind.
-argument:: value Function receiving a dict and returning either a UGen function or a role mapping.
-argument:: updateNodes Boolean (default false).
+argument:: key 
+Symbol name to bind.
+argument:: value 
+Function receiving a dict and returning either a UGen function or a role mapping.
+argument:: updateNodes 
+Boolean (default false).
 Returns:: The value inserted.
 
 EXAMPLES::
