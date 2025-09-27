@@ -20,7 +20,8 @@ CLASSMETHODS::
 
 METHOD:: new
 argument:: proxyspace 
-The ProxySpace this instance opereates on. Defaults to the Ndef proxyspace for the default server.
+The code::ProxySpace:: this instance operates on. Defaults to the Ndef proxyspace for the default server.
+If not the default Ndef proxyspace, the instance must be named and thus included in code::ProxySpace.all::.
 Returns:: An code::NPModules:: instance.
 
 METHOD:: parentDict

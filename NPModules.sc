@@ -80,12 +80,30 @@ NPModules {
         AbstractPlayControl.proxyControlClasses.put(\module, SynthDefControl);
         AbstractPlayControl.buildMethods.put(\module, #{ | func, proxy, channelOffset = 0, index |
             var role, moduleName, dict, obj;
-            var npModules = NPModules.all.at(proxy.proxyspace);
-
-            // create NPModules instance for this proxyspace if not existing yet
-            npModules.isNil.if({
-                npModules = NPModules(proxy.proxyspace);
+            var npModules;
+            
+            // get NPModules instance for this proxy
+            proxy.respondsTo(\proxyspace).if({
+                // simple case: proxy knows its proxyspace
+                npModules = NPModules.all.at(proxy.proxyspace);
+                // create NPModules instance for this proxyspace if not existing yet
+                npModules.isNil.if({
+                    npModules = NPModules(proxy.proxyspace);
+                });
+            }, {
+                // fallback: search all known ProxySpaces for the given proxy
+                var pspace = ProxySpace.all.selectAs({|space| space.envir.includes(proxy)}, Array).first; // first match
+                pspace.isNil.if({
+                    Error("AbstractPlayControl: could not find ProxySpace for given proxy. Did you name your proxyspace?").throw;
+                }, {
+                    npModules = NPModules.all.at(pspace);
+                    // create NPModules instance for this proxyspace if not existing yet
+                    npModules.isNil.if({
+                        npModules = NPModules(pspace);
+                    })
+                });
             });
+
 
             // func can be a Symbol (name of module) or a Dictionary (with at least an entry "\name")
             if(func.isKindOf(Symbol), {
