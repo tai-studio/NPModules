@@ -99,6 +99,13 @@ NPModules {
                     moduleName = func;
                     role = nil; // default role, i.e. function
                 },
+                {func.isKindOf(Association)}, {
+                    dict = ();
+                    moduleName = func.value;
+                    role = func.key;
+
+                    [role, moduleName.cs].postln
+                },
                 {// assumed to be a dictionary
                     dict = func; // pass whole dict to module function
                     moduleName = func[\name].value; // required
@@ -124,10 +131,12 @@ NPModules {
                 };
             }, {
                 // assume moduleName to be something that can be directly buildForProxy
-                obj = moduleName; // directly use function
+                if(role.notNil, {
+                    obj = role -> moduleName; // directly use function
+                }, {
+                    obj = moduleName; // directly use function
+                });
             });
-
-
             obj.buildForProxy(proxy, channelOffset, index);
         });
     }

@@ -124,7 +124,7 @@ Ndef(\a, {PMOsc.ar}); // simple sine
 ::
 
 
-Write your own modules by adding it to the registry for the relevant ProxySpace:
+Write your own module by adding it to the registry for the relevant ProxySpace:
 
 code::
 // Add custom module
@@ -151,3 +151,14 @@ n.put(\simpleSound, { |dict|
 }, updateNodes: true); // rebuild any proxies using this module
 ::
 
+For integration reasons, any valid NodeProxy role is also accepted as a module:
+
+code::
+Ndef(\d, {SinOsc.ar(\freq.kr(100))}); // direct function
+Ndef(\d, \module -> { SinOsc.ar(\freq.kr(100)) }); // same as above, using module role
+
+// but also
+Ndef(\d)[10] = \module -> (\filter -> {|in| in * SinOsc.ar(\freq.kr(10, lag: 0.2) * 0.998  \fIdx10.kr(1, spec: [1, 10, \lin, 1])).range(0, 1) }); 
+Ndef(\d)[20] = \module -> (\filter -> {|in| in * SinOsc.ar(\freq.kr(10, lag: 0.2) * 0.999 * \fIdx20.kr(1, spec: [1, 10, \lin, 1])).range(0, 1) }); 
+
+::
