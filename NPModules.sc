@@ -80,59 +80,87 @@ NPModules {
         AbstractPlayControl.proxyControlClasses.put(\module, SynthDefControl);
         AbstractPlayControl.buildMethods.put(\module, #{ | func, proxy, channelOffset = 0, index |
             var role, moduleName, dict, obj;
-            var npModules;
-            
-            // get NPModules instance for this proxy
-            proxy.respondsTo(\proxyspace).if({
-                // simple case: proxy knows its proxyspace
-                npModules = NPModules.all.at(proxy.proxyspace);
-                // create NPModules instance for this proxyspace if not existing yet
-                npModules.isNil.if({
-                    npModules = NPModules(proxy.proxyspace);
-                });
-            }, {
-                // fallback: search all known ProxySpaces for the given proxy
-                var pspace = ProxySpace.all.selectAs({|space| space.envir.includes(proxy)}, Array).first; // first match
-                pspace.isNil.if({
-                    Error("AbstractPlayControl: could not find ProxySpace for given proxy. Did you name your proxyspace?").throw;
-                }, {
-                    npModules = NPModules.all.at(pspace);
-                    // create NPModules instance for this proxyspace if not existing yet
-                    npModules.isNil.if({
-                        npModules = NPModules(pspace);
-                    })
-                });
-            });
+            var npModules = NPModules.for(proxy); // get NPModules instance for this proxy         
+    
+                
+            // func can be 
+            // a Symbol (name of module), 
+            // a function
+            // an association
+            // a Dictionary (with at least an entry "\name"),
+            case(
+                {func.isKindOf(Symbol)}, {
+                    dict = (); // empty dict
+                    moduleName = func;
+                    role = nil; // default role, i.e. function
+                },
+                {func.isKindOf(Function)}, {
+                    dict = (); // empty dict
+                    moduleName = func;
+                    role = nil; // default role, i.e. function
+                },
+                {// assumed to be a dictionary
+                    dict = func; // pass whole dict to module function
+                    moduleName = func[\name].value; // required
+                    role = func[\role].value; // returns nil if not present
+                }
+            );
 
-
-            // func can be a Symbol (name of module) or a Dictionary (with at least an entry "\name")
-            if(func.isKindOf(Symbol), {
-                dict = (); // empty dict
-                moduleName = func;
-                role = nil; // default role, i.e. function
-            }, { // assumed to be a dictionary
-                dict = func; // pass whole dict to module function
-                moduleName = func[\name].value; // required
-                role = func[\role].value; // returns nil if not present
-            });
-            if(moduleName.isNil) { Error("AbstractPlayControl: no module name given").throw };
+            moduleName.isNil.if{ Error("AbstractPlayControl: no module name given").throw };
             // if(moduleName.isNil) { moduleName = \default }; // fallback to default module
-            func = npModules[moduleName]; // get function from npModules
-            if(func.isNil) { 
-                ("AbstractPlayControl: no module named '%' found, using default module instead".format(moduleName)).warn;
-                role = nil; // ignore role
-                func = npModules[\default] // fallback to default module
-            }; 
 
-            if(role.notNil) {
-                obj = (role -> func.value(dict, index));
-            } {
-                obj = func.value(dict, index);
-            };
+            
+            moduleName.isKindOf(Symbol).if({
+                func = npModules[moduleName]; // get function from npModules
+                if(func.isNil) { 
+                    ("AbstractPlayControl: no module named '%' found, using default module instead".format(moduleName)).warn;
+                    role = nil; // ignore role
+                    func = npModules[\default] // fallback to default module
+                }; 
+                if(role.notNil) {
+                    obj = (role -> (func.value(dict, index)));
+                } {
+                    obj = func.value(dict, index);
+                };
+            }, {
+                // assume moduleName to be something that can be directly buildForProxy
+                obj = moduleName; // directly use function
+            });
+
 
             obj.buildForProxy(proxy, channelOffset, index);
         });
     }
+
+
+    *for {|proxy|
+        var npModules;
+        // get NPModules instance for this proxy
+        proxy.respondsTo(\proxyspace).if({
+            // simple case: proxy knows its proxyspace
+            npModules = NPModules.all.at(proxy.proxyspace);
+            // create NPModules instance for this proxyspace if not existing yet
+            npModules.isNil.if({
+                npModules = NPModules(proxy.proxyspace);
+            });
+        }, {
+            // TODO: add caching with a dict that maps proxies to their NPModules instance?
+            // fallback: search all known ProxySpaces for the given proxy
+            var pspace = ProxySpace.all.selectAs({|space| space.envir.includes(proxy)}, Array).first; // first match
+            pspace.isNil.if({
+                Error("AbstractPlayControl: could not find ProxySpace for given proxy. Did you name your proxyspace?").throw;
+            }, {
+                // npModules = NPModules.all.at(pspace);
+                // // create NPModules instance for this proxyspace if not existing yet
+                // npModules.isNil.if({
+                // smart constructor: either returns existing instance or creates a new one
+                npModules = NPModules(pspace);
+                // })
+            });
+        });
+        ^npModules;
+    }
+
 
     *new {|proxyspace|
         // the default space is the Ndef localhost space
