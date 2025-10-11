@@ -42,7 +42,7 @@ NPModules {
                     in = in * ampDb.dbamp;
                 })
             },
-                
+
             in: {|dict|
                 var ins = dict[\ins] ? 0;
                 {
@@ -52,8 +52,8 @@ NPModules {
             lhpf: {|dict|
                 var lpFreq = dict[\lpFreq] ? 12000;
                 var hpFreq = dict[\hpFreq] ? 20;
-                    
-                (\filter -> {|in| 
+
+                (\filter -> {|in|
                     LPF.ar(HPF.ar(in, hpFreq), lpFreq);
                 })
             },
@@ -80,11 +80,10 @@ NPModules {
         AbstractPlayControl.proxyControlClasses.put(\module, SynthDefControl);
         AbstractPlayControl.buildMethods.put(\module, #{ | func, proxy, channelOffset = 0, index |
             var role, moduleName, dict, obj;
-            var npModules = NPModules.for(proxy); // get NPModules instance for this proxy         
-    
-                
-            // func can be 
-            // a Symbol (name of module), 
+            var npModules = NPModules.for(proxy); // get NPModules instance for this proxy
+
+            // func can be
+            // a Symbol (name of module),
             // a function
             // an association
             // a Dictionary (with at least an entry "\name"),
@@ -116,14 +115,14 @@ NPModules {
             moduleName.isNil.if{ Error("AbstractPlayControl: no module name given").throw };
             // if(moduleName.isNil) { moduleName = \default }; // fallback to default module
 
-            
+
             moduleName.isKindOf(Symbol).if({
                 func = npModules[moduleName]; // get function from npModules
-                if(func.isNil) { 
+                if(func.isNil) {
                     ("AbstractPlayControl: no module named '%' found, using default module instead".format(moduleName)).warn;
                     role = nil; // ignore role
                     func = npModules[\default] // fallback to default module
-                }; 
+                };
                 if(role.notNil) {
                     obj = (role -> (func.value(dict, index)));
                 } {
@@ -139,6 +138,38 @@ NPModules {
             });
             obj.buildForProxy(proxy, channelOffset, index);
         });
+
+		///////////////////// pmodule is like module but for streams
+		AbstractPlayControl.proxyControlClasses.put(\pmodule, StreamControl);
+		AbstractPlayControl.buildMethods.put(\pmodule, AbstractPlayControl.buildMethods[\module]);
+
+        ///////////////////// filterWet is like filter but without wet control (all wet)
+
+        AbstractPlayControl.proxyControlClasses.put(\filterWet, SynthDefControl);
+        AbstractPlayControl.buildMethods.put(\filterWet, #{ | func, proxy, channelOffset = 0, index |
+            var ok, ugen;
+            if(proxy.isNeutral) {
+                asSynthDef {
+                    ugen = func.value(Silent.ar);
+                    ok = proxy.initBus(ugen.rate, ugen.numChannels + channelOffset);
+                    if(ok.not) { Error("NodeProxy input: wrong rate/numChannels").throw }
+                }
+            };
+
+            { | out |
+                var env;
+                if(proxy.rate === 'audio') {
+                    env = EnvGate(i_level: 0, doneAction:2, curve:\sin);
+                    XOut.ar(out, env, SynthDef.wrap(func, nil, [In.ar(out, proxy.numChannels)]))
+                } {
+                    env = EnvGate(i_level: 0, doneAction:2, curve:\lin);
+                    XOut.kr(out, env, SynthDef.wrap(func, nil, [In.kr(out, proxy.numChannels)]))
+                };
+            }.buildForProxy( proxy, channelOffset, index )
+        });
+
+
+
     }
 
 
@@ -190,7 +221,7 @@ NPModules {
     }
 
     at {|key|
-        ^moduleDict[key]    
+        ^moduleDict[key]
     }
 
     // borrowed from Modality Toolkit (+Dictionary)
@@ -215,25 +246,36 @@ NPModules {
                     var source = synthDefControl.source;
                     // "source: %".format(source.asCompileString()).postln;
                     source.respondsTo(\key).if{
-                        (source.key == \module).if {
-                            var module = source.value;
-
-                            // "module: %".format(module).postln;
-                            // "idx: % (%)".format(idx, idx.class).postln;
-                            // "proxy: %".format(proxy.asCompileString()).postln;
-
-                            // module can be either a Symbol or a Dictionary
-                            // check if module is for the given name
-                            module.respondsTo(\at).if({ // is a dictionary
-                                (module[\name] == key).if{
-                                    proxy.put(idx, source); // trigger rebuild
-                                };
-                            }, { // assume module to be a symbol
-                                (module == key).if{
-                                    proxy.put(idx, source); // trigger rebuild
-                                };
-                            });
-                        };
+						switch (source.key,
+							\module, {
+								var module = source.value;
+								// module can be either Symbol, Dictionary, Function.
+								// check if module is for the given name
+								module.respondsTo(\at).if({ // is a dictionary
+									(module[\name] == key).if{
+										proxy.put(idx, source); // trigger rebuild
+									};
+								}, { // assume module to be a symbol or function
+									(module == key).if{
+										proxy.put(idx, source); // trigger rebuild
+									};
+								});
+							},
+							\pmodule, {
+								var module = source.value;
+								// module can be either Symbol, Dictionary, Function.
+								// check if module is for the given name
+								module.respondsTo(\at).if({ // is a dictionary
+									(module[\name] == key).if{
+										proxy.put(idx, source); // trigger rebuild
+									};
+								}, { // assume module to be a symbol
+									(module == key).if{
+										proxy.put(idx, source); // trigger rebuild
+									};
+								});
+							}
+						);
                     };
                 }
             }
