@@ -78,7 +78,8 @@ NPModules {
     // to avoid name clashes when multiple instances of the same module are used
     // e.g. \freq -> \freq0, \freq1, ...
     *krFunc {|name, spec, dict, lag|
-		^(dict[name] ?? {{ "%%".format(name, dict.idx).asSymbol.kr(spec: spec, lag: lag) }});
+		var symbol = "%%".format(name, dict.idx).asSymbol;
+		^(dict[name.asSymbol] ?? {{ symbol.kr(spec: spec, lag: lag) }});
     }
 
 	krFunc  {|name, spec, dict, lag|
