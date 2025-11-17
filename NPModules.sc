@@ -13,30 +13,33 @@ NPModules {
 
         parentDict = (
             sine: {|dict|
-                var freq = dict[\freq] ?? {{\freq.kr(440)}};
+				// var freq = dict[\freq] ?? {{\freq.kr(440)}};
+                var freq = this.krFunc(\freq, \freq.asSpec, dict);
                 {
                     SinOsc.ar(freq)
                 }
             },
             sinefb: {|dict|
-                var freq = dict[\freq] ?? {{\freq.kr(440)}};
-                var fb = dict[\fb] ?? {{\fb.kr(0, spec: [0, 2])}};
+                var freq = this.krFunc(\freq, \freq.asSpec, dict);
+				var fb = this.krFunc(\fb, [0, 2], dict);
                 {
                     SinOscFB.ar(freq, fb)
                 }
             },
             amp: {|dict|
-                var amp = dict[\amp] ? 0.1;
+				var amp = this.krFunc(\amp, [0, 1], dict);
+
                 (\filter -> {|in|
                     in * amp
                 })
             },
-            util: {|dict, idx|
-                var ampDb   = this.krFunc(\ampDb, [-24, 24, \lin, 0, 0], dict, idx);
-                var distort = this.krFunc(\distort, [0, 10, \lin, 0, 0], dict, idx);
-                var lpFreq  = this.krFunc(\lpFreq, \freq.asSpec.default_(20), dict, idx);
-                var hpFreq  = this.krFunc(\hpFreq, \freq.asSpec.default_(20000), dict, idx);
-                (\filter -> {|in|
+            util: {|dict|
+                var ampDb   = this.krFunc(\ampDb, [-24, 24, \lin, 0, 0], dict);
+                var distort = this.krFunc(\distort, [0, 10, \lin, 0, 0], dict);
+                var lpFreq  = this.krFunc(\lpFreq, \freq.asSpec.default_(20), dict);
+                var hpFreq  = this.krFunc(\hpFreq, \freq.asSpec.default_(20000), dict);
+
+				(\filter -> {|in|
                     in = (in * (1+distort)).tanh;
                     in = LPF.ar(HPF.ar(in, hpFreq), lpFreq);
                     in = in * ampDb.dbamp;
@@ -45,25 +48,27 @@ NPModules {
 
             in: {|dict|
                 var ins = dict[\ins] ? 0;
-                {
+
+				{
                     SoundIn.ar(ins)
                 }
             },
             lhpf: {|dict|
-                var lpFreq = dict[\lpFreq] ? 12000;
-                var hpFreq = dict[\hpFreq] ? 20;
+				var lpFreq = this.krFunc(\lpFreq, \freq.asSpec.default_(12000), dict);
+				var hpFreq = this.krFunc(\hpFreq, \freq.asSpec.default_(20), dict);
 
                 (\filter -> {|in|
                     LPF.ar(HPF.ar(in, hpFreq), lpFreq);
                 })
             },
-            distort: {|dict, idx|
-                var distort = dict[\distort] ? 0;
-                (\filter -> {|in| (in * (1+distort)).tanh})
+            distort: {|dict|
+				var distort = this.krFunc(\distort, [0, 10], dict);
+
+				(\filter -> {|in| (in * (1+distort)).tanh})
             },
             default: {|dict|
                 {
-                    {nil} // TODO: would be nice to be able to completely remvove the module, i.e. np[idx] = nil.
+                    {nil} // TODO: would be nice to be able to completely remove the module, i.e. np[idx] = nil.
                 }
             }
         )
@@ -72,17 +77,21 @@ NPModules {
     // helper function to create kr control functions with index suffix
     // to avoid name clashes when multiple instances of the same module are used
     // e.g. \freq -> \freq0, \freq1, ...
-    *krFunc {|name, spec, dict, idx, lag|
-        ^(dict[name] ?? {{ "%%".format(name, idx).asSymbol.kr(spec: spec, lag: lag) }});
+    *krFunc {|name, spec, dict, lag|
+		^(dict[name] ?? {{ "%%".format(name, dict.idx).asSymbol.kr(spec: spec, lag: lag) }});
     }
 
-    *registerToAbstractPlayControl {
+	krFunc  {|name, spec, dict, lag|
+		^this.class.krFunc(name, spec, dict, dict.idx, lag);
+	}
+
+	*registerToAbstractPlayControl {
         AbstractPlayControl.proxyControlClasses.put(\module, SynthDefControl);
         AbstractPlayControl.buildMethods.put(\module, #{ | func, proxy, channelOffset = 0, index |
             var role, moduleName, dict, obj;
             var npModules = NPModules.for(proxy); // get NPModules instance for this proxy
 
-            // func can be
+			// func can be
             // a Symbol (name of module),
             // a function
             // an association
@@ -103,7 +112,7 @@ NPModules {
                     moduleName = func.value;
                     role = func.key;
 
-                    [role, moduleName.cs].postln
+					// [role, moduleName.cs].postln
                 },
                 {// assumed to be a dictionary
                     dict = func; // pass whole dict to module function
@@ -111,6 +120,10 @@ NPModules {
                     role = func[\role].value; // returns nil if not present
                 }
             );
+
+			// add index to dictionary
+			dict[\idx] = index;
+
 
             moduleName.isNil.if{ Error("AbstractPlayControl: no module name given").throw };
             // if(moduleName.isNil) { moduleName = \default }; // fallback to default module
