@@ -86,6 +86,22 @@ NPModules {
 		^this.class.krFunc(name, spec, dict, dict.idx, lag);
 	}
 
+    *inFunc {|name, spec, dict, lag, rate = \control|
+		var symbol = "%%".format(name, dict.idx).asSymbol;
+        var rateSymbol = switch(rate,
+            \audio, \ar,
+            \control, \kr,
+            \trigger, \tr,
+            \scalar, \ir,
+            { Error("Meta_NPModules:inFunc: unknown rate '%'".format(rate)).throw }
+        );
+
+        
+		^(dict[name.asSymbol] ?? {{ 
+            symbol.perform(nil, lag, false, spec) 
+            // symbol.kr(spec: spec, lag: lag) 
+        }});
+    }
 	*registerToAbstractPlayControl {
         AbstractPlayControl.proxyControlClasses.put(\module, SynthDefControl);
         AbstractPlayControl.buildMethods.put(\module, #{ | func, proxy, channelOffset = 0, index |
@@ -256,6 +272,9 @@ NPModules {
     }
 
 	*put {|key, value, updateNodes = true| // add to all instances
+        // make sure at least the default NPModules instance exists
+        this.new();
+
         this.all.do{|instance|
             instance.put(key, value, updateNodes);
         }
