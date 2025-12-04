@@ -255,6 +255,12 @@ NPModules {
         ^this.pr_allKeys(Array).flat.asSet
     }
 
+	*put {|key, value, updateNodes = true| // add to all instances
+        this.all.do{|instance|
+            instance.put(key, value, updateNodes);
+        }
+	}
+
     put {|key, value, updateNodes = true|
         moduleDict.put(key, value);
         updateNodes.if{

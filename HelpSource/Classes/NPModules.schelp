@@ -36,6 +36,19 @@ A dictionary of all code::NPModules:: instances.
 METHOD:: registerToAbstractPlayControl
 announces the code::\module -> :: role for code::NodeProxy:: instances. See link::Reference/NodeProxy_roles:: .
 
+METHOD:: put
+add a mmodule to all existing instances.
+Note that the instances need to be registered in code::NPModules.all::, i.e. meed to be called at least once for this to work.
+
+argument:: key
+Symbol name to bind.
+argument:: value
+Function receiving a dict and returning either a UGen function or a role mapping.
+argument:: updateNodes
+Boolean (default false).
+
+
+
 METHOD:: krFunc
 helper function to create kr control functions with index suffix to avoid name clashes when multiple instances of the same module are used e.g. code::\freq -> \freq0, \freq1, ...::
 
@@ -65,9 +78,7 @@ the base name (Symbol).
 argument:: spec
 the spec to use
 argument:: dict
-the dictionary passed to the module function.
-argument:: idx
-the index of the NodeProxy instance.
+the dictionary passed to the module function. This contains, among other things, the code::idx:: of the module instance in the NodeProxy and code::numChans:: of the NodeProxy.
 argument:: lag
 lag time. defaults to 0
 RETURNS:: A function that returns a link::Classes/NamedControl:: with the appropriate name and spec.
