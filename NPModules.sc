@@ -122,8 +122,11 @@ NPModules {
                 }
             );
 
-			// add index to dictionary
+			// add stuff to dictionary
 			dict[\idx] = index;
+			dict[\proxy] = proxy;
+			dict[\channelOffset] = channelOffset;
+
 
 
             moduleName.isNil.if{ Error("AbstractPlayControl: no module name given").throw };
@@ -174,10 +177,10 @@ NPModules {
                 var env;
                 if(proxy.rate === 'audio') {
                     env = EnvGate(i_level: 0, doneAction:2, curve:\sin);
-                    XOut.ar(out, env, SynthDef.wrap(func, nil, [In.ar(out, proxy.numChannels)]))
+					XOut.ar(out, env, SynthDef.wrap(func, nil, [In.ar(out, proxy.numChannels)]))
                 } {
                     env = EnvGate(i_level: 0, doneAction:2, curve:\lin);
-                    XOut.kr(out, env, SynthDef.wrap(func, nil, [In.kr(out, proxy.numChannels)]))
+					XOut.kr(out, env, SynthDef.wrap(func, nil, [In.kr(out, proxy.numChannels)]))
                 };
             }.buildForProxy( proxy, channelOffset, index )
         });
