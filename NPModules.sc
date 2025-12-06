@@ -14,57 +14,59 @@ NPModules {
         parentDict = (
             sine: {|dict|
 				// var freq = dict[\freq] ?? {{\freq.kr(440)}};
-                var freq = this.krFunc(\freq, \freq.asSpec, dict);
                 {
+					var freq = this.krFunc(\freq, \freq.asSpec, dict);
                     SinOsc.ar(freq)
                 }
             },
             sinefb: {|dict|
-                var freq = this.krFunc(\freq, \freq.asSpec, dict);
-				var fb = this.krFunc(\fb, [0, 2], dict);
                 {
-                    SinOscFB.ar(freq, fb)
+					var freq = this.krFunc(\freq, \freq.asSpec, dict);
+					var fb = this.krFunc(\fb, [0, 2], dict);
+					SinOscFB.ar(freq, fb)
                 }
             },
             amp: {|dict|
-				var amp = this.krFunc(\amp, [0, 1], dict);
 
                 (\filter -> {|in|
+					var amp = this.krFunc(\amp, [0, 1], dict);
                     in * amp
                 })
             },
             util: {|dict|
-                var ampDb   = this.krFunc(\ampDb, [-24, 24, \lin, 0, 0], dict);
-                var distort = this.krFunc(\distort, [0, 10, \lin, 0, 0], dict);
-                var lpFreq  = this.krFunc(\lpFreq, \freq.asSpec.default_(20), dict);
-                var hpFreq  = this.krFunc(\hpFreq, \freq.asSpec.default_(20000), dict);
 
 				(\filter -> {|in|
-                    in = (in * (1+distort)).tanh;
+					var ampDb   = this.krFunc(\ampDb, [-24, 24, \lin, 0, 0], dict);
+					var distort = this.krFunc(\distort, [0, 10, \lin, 0, 0], dict);
+					var lpFreq  = this.krFunc(\lpFreq, \freq.asSpec.default_(20), dict);
+					var hpFreq  = this.krFunc(\hpFreq, \freq.asSpec.default_(20000), dict);
+					in = (in * (1+distort)).tanh;
                     in = LPF.ar(HPF.ar(in, hpFreq), lpFreq);
                     in = in * ampDb.dbamp;
                 })
             },
 
             in: {|dict|
-                var ins = dict[\ins] ? 0;
 
 				{
+					var ins = dict[\ins] ? 0;
                     SoundIn.ar(ins)
                 }
             },
             lhpf: {|dict|
-				var lpFreq = this.krFunc(\lpFreq, \freq.asSpec.default_(12000), dict);
-				var hpFreq = this.krFunc(\hpFreq, \freq.asSpec.default_(20), dict);
 
                 (\filter -> {|in|
-                    LPF.ar(HPF.ar(in, hpFreq), lpFreq);
+					var lpFreq = this.krFunc(\lpFreq, \freq.asSpec.default_(12000), dict);
+					var hpFreq = this.krFunc(\hpFreq, \freq.asSpec.default_(20), dict);
+					LPF.ar(HPF.ar(in, hpFreq), lpFreq);
                 })
             },
             distort: {|dict|
-				var distort = this.krFunc(\distort, [0, 10], dict);
 
-				(\filter -> {|in| (in * (1+distort)).tanh})
+				(\filter -> {|in|
+					var distort = this.krFunc(\distort, [0, 10], dict);
+					(in * (1+distort)).tanh
+				})
             },
             default: {|dict|
                 {
@@ -79,7 +81,7 @@ NPModules {
     // e.g. \freq -> \freq0, \freq1, ...
     *krFunc {|name, spec, dict, lag|
 		var symbol = "%%".format(name, dict.idx).asSymbol;
-		^(dict[name.asSymbol] ?? {{ symbol.kr(spec: spec, lag: lag) }});
+		^(dict[name.asSymbol] ?? {{ symbol.kr(spec: spec, lag: lag) }}).value;
     }
 
 	krFunc  {|name, spec, dict, lag|
@@ -96,11 +98,11 @@ NPModules {
             { Error("Meta_NPModules:inFunc: unknown rate '%'".format(rate)).throw }
         );
 
-        
-		^(dict[name.asSymbol] ?? {{ 
-            symbol.perform(nil, lag, false, spec) 
-            // symbol.kr(spec: spec, lag: lag) 
-        }});
+
+		^(dict[name.asSymbol] ?? {{
+            symbol.perform(rateSymbol, nil, lag, false, spec)
+            // symbol.kr(spec: spec, lag: lag)
+        }}).value;
     }
 	*registerToAbstractPlayControl {
         AbstractPlayControl.proxyControlClasses.put(\module, SynthDefControl);
