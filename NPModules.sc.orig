@@ -100,9 +100,15 @@ NPModules {
 
 
 		^(dict[name.asSymbol] ?? {{
+<<<<<<< HEAD
             symbol.perform(rateSymbol, nil, lag, false, spec)
             // symbol.kr(spec: spec, lag: lag)
         }}).value;
+=======
+            // symbol.kr/ir(spec: spec, lag: lag)
+            symbol.perform(rateSymbol, nil, lag, false, spec)
+        }});
+>>>>>>> c5ef55e (small fix)
     }
 	*registerToAbstractPlayControl {
         AbstractPlayControl.proxyControlClasses.put(\module, SynthDefControl);
