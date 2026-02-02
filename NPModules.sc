@@ -79,11 +79,19 @@ NPModules {
     // helper function to create kr control functions with index suffix
     // to avoid name clashes when multiple instances of the same module are used
     // e.g. \freq -> \freq0, \freq1, ...
-    *krFunc {|name, spec, dict, lag|
-		var symbol = "%%".format(name, dict.idx).asSymbol;
-		^(dict[name.asSymbol] ?? {{ symbol.kr(spec: spec, lag: lag) }}).value;
-    }
+    *krFunc {|name, spec, dict, lag = 0|
+    	var symbol = "%%".format(name, dict.idx).asSymbol;
+		spec = spec.asSpec;
 
+        dict[name.asSymbol].notNil.if({
+            ^(dict[name.asSymbol]).value;
+        }, {
+    		^(dict[name.asSymbol] ?? {{ symbol.kr(spec: spec).varlag(lag, warp: spec.warp.asSpecifier) }.value});
+        });
+    }
+	*krGain {|dict, lag = 0|
+		^(this.krFunc(\gainDb, [-48, 24, \lin, 0, 0], dict, lag).dbamp - (-48.dbamp.round(0.000000003)))
+	}
 	krFunc  {|name, spec, dict, lag|
 		^this.class.krFunc(name, spec, dict, lag);
 	}
@@ -97,7 +105,6 @@ NPModules {
             \scalar, \ir,
             { Error("Meta_NPModules:inFunc: unknown rate '%'".format(rate)).throw }
         );
-
 
 		^(dict[name.asSymbol] ?? {{
             symbol.perform(rateSymbol, nil, lag, false, spec)
